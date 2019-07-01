@@ -3,6 +3,7 @@ package connection
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"sync"
@@ -26,22 +27,8 @@ type Connection struct {
 	client     *http.Client
 }
 
-// NotReadyError thrown when it is not ready
-type NotReadyError struct {
-	s string
-}
-
-type AlreadyConnectingError struct {
-	s string
-}
-
-func (e AlreadyConnectingError) Error() string {
-	return "already connecting"
-}
-
-func (e NotReadyError) Error() string {
-	return "not ready"
-}
+var NotReadyError = errors.New("not ready")
+var AlreadyConnectingError = errors.New("currently connecting")
 
 // Option is the type all options need to adhere to
 type Option func(c *Connection)
@@ -75,6 +62,12 @@ func New(options ...Option) *Connection {
 
 // Close will close connections
 func (c *Connection) Close() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Debug("Recovered in Close", r)
+		}
+	}()
+
 	c.ready = false
 	if c.client != nil {
 		c.client.CloseIdleConnections()
@@ -87,13 +80,19 @@ func (c *Connection) Close() (err error) {
 
 // Connect will connect
 func (c *Connection) Connect() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Debug("Recovered in Connect", r)
+		}
+	}()
+
 	if c.connecting {
-		err = AlreadyConnectingError{}
-		return
+		return AlreadyConnectingError
 	}
 	c.connecting = true
 	c.ready = false
 
+	// close any current connections
 	c.Close()
 
 	log.Debugf("%s setting up client", c.name)
@@ -152,19 +151,20 @@ func (c *Connection) Connect() (err error) {
 // Get will get a URL
 func (c *Connection) Get(urlToGet string) (resp *http.Response, err error) {
 	if !c.ready {
-		// returns not ready error if its currently connecting
-		err = NotReadyError{}
+		err = NotReadyError
 		return
 	}
 
+	log.Debugf("[%s] getting %s", c.name, urlToGet)
 	resp, err = c.client.Get(urlToGet)
 	if err != nil || resp.StatusCode != 200 {
 		if err != nil {
-			log.Debug("[%s] got error: %s", c.name, err.Error())
+			log.Debugf("[%s] got error: %s", c.name, err.Error())
 		} else {
-			log.Debug("[%s] got status code: %d", resp.StatusCode)
+			log.Debugf("[%s] got status code: %d", c.name, resp.StatusCode)
+			// bad code received, reload
+			go c.Connect()
 		}
-		// TODO: if bad code (403/500) then reload the tor
 	}
 
 	return

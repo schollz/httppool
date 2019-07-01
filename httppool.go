@@ -2,7 +2,9 @@ package httppool
 
 import (
 	"fmt"
-	"sync"
+	"math/rand"
+	"net/http"
+	"time"
 
 	"github.com/schollz/httppool/connection"
 	log "github.com/schollz/logger"
@@ -51,19 +53,14 @@ func New(options ...Option) *HTTPPool {
 	}
 
 	h.conn = make([]*connection.Connection, h.numClients)
-	var wg sync.WaitGroup
-	wg.Add(h.numClients)
 	for i := 0; i < h.numClients; i++ {
-		go func(i int) {
-			defer wg.Done()
-			h.conn[i] = connection.New(
-				connection.OptionDebug(h.debug),
-				connection.OptionName(fmt.Sprintf("%d", i)),
-			)
-			h.conn[i].Connect()
-		}(i)
+		h.conn[i] = connection.New(
+			connection.OptionDebug(h.debug),
+			connection.OptionName(fmt.Sprintf("%d", i)),
+		)
+		go h.conn[i].Connect()
 	}
-	wg.Wait()
+
 	return &h
 }
 
@@ -76,4 +73,58 @@ func (h *HTTPPool) Close() (err error) {
 		}
 	}
 	return
+}
+
+// Get will randomly select a client in the pool
+func (h *HTTPPool) Get(urlToGet string) (resp *http.Response, err error) {
+	ar := make([]int, h.numClients)
+	for i := 0; i < len(ar); i++ {
+		ar[i] = i
+	}
+
+	// try one until we get one that is ready
+tryagain:
+	shuffle(ar)
+	for _, i := range ar {
+		resp, err = h.conn[i].Get(urlToGet)
+		if err != nil {
+			switch err {
+			case connection.AlreadyConnectingError:
+				log.Debugf("%d is connecting", i)
+				continue
+			case connection.NotReadyError:
+				log.Debugf("%d is not ready", i)
+				continue
+			default:
+				break
+			}
+		}
+		break
+	}
+	if err != nil {
+		switch err {
+		case connection.AlreadyConnectingError:
+			log.Debug("all are already connecting")
+			time.Sleep(5 * time.Second)
+			goto tryagain
+		case connection.NotReadyError:
+			log.Debug("all are not ready")
+			time.Sleep(1 * time.Second)
+			goto tryagain
+		default:
+			log.Debug("Unknown error occurred")
+		}
+	}
+	log.Debug(err)
+	return
+}
+
+func shuffle(slice []int) {
+	r := rand.New(rand.NewSource(time.Now().Unix()))
+	for len(slice) > 0 {
+		n := len(slice)
+		randIndex := r.Intn(n)
+		slice[n-1], slice[randIndex] = slice[randIndex], slice[n-1]
+		slice = slice[:n-1]
+	}
 }
