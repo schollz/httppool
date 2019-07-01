@@ -58,6 +58,7 @@ func New(options ...Option) *HTTPPool {
 			connection.OptionDebug(h.debug),
 			connection.OptionName(fmt.Sprintf("%d", i)),
 		)
+		log.Debugf("starting connection for %d", i)
 		go h.conn[i].Connect()
 	}
 
@@ -92,6 +93,7 @@ func (h *HTTPPool) Get(urlToGet string) (resp *http.Response, err error) {
 tryagain:
 	shuffle(ar)
 	for _, i := range ar {
+		log.Debugf("[%d] getting %s", i, urlToGet)
 		resp, err = h.conn[i].Get(urlToGet)
 		if err != nil {
 			switch err {
@@ -116,10 +118,9 @@ tryagain:
 }
 
 func shuffle(slice []int) {
-	r := rand.New(rand.NewSource(time.Now().Unix()))
 	for len(slice) > 0 {
 		n := len(slice)
-		randIndex := r.Intn(n)
+		randIndex := rand.Intn(n)
 		slice[n-1], slice[randIndex] = slice[randIndex], slice[n-1]
 		slice = slice[:n-1]
 	}
