@@ -96,7 +96,6 @@ tryagain:
 		if err != nil {
 			switch err {
 			case connection.NotReadyError:
-				log.Debugf("%d is not ready", i)
 				continue
 			default:
 				break
@@ -107,14 +106,12 @@ tryagain:
 	if err != nil {
 		switch err {
 		case connection.NotReadyError:
-			log.Debug("all are not ready")
 			time.Sleep(1 * time.Second)
 			goto tryagain
 		default:
 			log.Debug("Unknown error occurred")
 		}
 	}
-	log.Debug(err)
 	return
 }
 
