@@ -18,17 +18,25 @@ type Connection struct {
 	debug bool
 	name  string
 
-	ready     bool
-	ipAddress string
-	tor       *tor.Tor
-	client    *http.Client
-
-	sync.Mutex
+	connecting bool
+	ready      bool
+	readyLock  sync.Mutex
+	ipAddress  string
+	tor        *tor.Tor
+	client     *http.Client
 }
 
 // NotReadyError thrown when it is not ready
 type NotReadyError struct {
 	s string
+}
+
+type AlreadyConnectingError struct {
+	s string
+}
+
+func (e AlreadyConnectingError) Error() string {
+	return "already connecting"
 }
 
 func (e NotReadyError) Error() string {
@@ -67,6 +75,7 @@ func New(options ...Option) *Connection {
 
 // Close will close connections
 func (c *Connection) Close() (err error) {
+	c.ready = false
 	if c.client != nil {
 		c.client.CloseIdleConnections()
 	}
@@ -78,6 +87,13 @@ func (c *Connection) Close() (err error) {
 
 // Connect will connect
 func (c *Connection) Connect() (err error) {
+	if c.connecting {
+		err = AlreadyConnectingError{}
+		return
+	}
+	c.connecting = true
+	c.ready = false
+
 	c.Close()
 
 	log.Debugf("%s setting up client", c.name)
@@ -125,10 +141,11 @@ func (c *Connection) Connect() (err error) {
 		}
 		log.Debugf("%s: new IP: %s", c.name, bytes.TrimSpace(body))
 		c.ipAddress = string(bytes.TrimSpace(body))
-		c.ready = true
 		break
 	}
 
+	c.ready = true
+	c.connecting = false
 	return
 }
 
@@ -139,13 +156,16 @@ func (c *Connection) Get(urlToGet string) (resp *http.Response, err error) {
 		err = NotReadyError{}
 		return
 	}
-	c.ready = false
-	defer func() {
-		c.ready = true
-	}()
 
 	resp, err = c.client.Get(urlToGet)
-	// TODO: if bad code (403/500) then reload the tor
+	if err != nil || resp.StatusCode != 200 {
+		if err != nil {
+			log.Debug("[%s] got error: %s", c.name, err.Error())
+		} else {
+			log.Debug("[%s] got status code: %d", resp.StatusCode)
+		}
+		// TODO: if bad code (403/500) then reload the tor
+	}
 
 	return
 }
