@@ -5,6 +5,7 @@ import (
 	"context"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/cretz/bine/tor"
@@ -13,12 +14,25 @@ import (
 
 // Connection defines a connection
 type Connection struct {
+	// config paramters
 	debug bool
 	name  string
 
+	ready     bool
 	ipAddress string
 	tor       *tor.Tor
 	client    *http.Client
+
+	sync.Mutex
+}
+
+// NotReadyError thrown when it is not ready
+type NotReadyError struct {
+	s string
+}
+
+func (e NotReadyError) Error() string {
+	return "not ready"
 }
 
 // Option is the type all options need to adhere to
@@ -111,8 +125,27 @@ func (c *Connection) Connect() (err error) {
 		}
 		log.Debugf("%s: new IP: %s", c.name, bytes.TrimSpace(body))
 		c.ipAddress = string(bytes.TrimSpace(body))
+		c.ready = true
 		break
 	}
+
+	return
+}
+
+// Get will get a URL
+func (c *Connection) Get(urlToGet string) (resp *http.Response, err error) {
+	if !c.ready {
+		// returns not ready error if its currently connecting
+		err = NotReadyError{}
+		return
+	}
+	c.ready = false
+	defer func() {
+		c.ready = true
+	}()
+
+	resp, err = c.client.Get(urlToGet)
+	// TODO: if bad code (403/500) then reload the tor
 
 	return
 }
