@@ -52,13 +52,14 @@ func New(options ...Option) *Connection {
 }
 
 // Close will close connections
-func (c *Connection) Close() {
+func (c *Connection) Close() (err error) {
 	if c.client != nil {
 		c.client.CloseIdleConnections()
 	}
 	if c.tor != nil {
-		c.tor.Close()
+		err = c.tor.Close()
 	}
+	return
 }
 
 // Connect will connect
