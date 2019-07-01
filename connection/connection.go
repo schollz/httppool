@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cretz/bine/tor"
+	"github.com/schollz/bine/tor"
 	log "github.com/schollz/logger"
 )
 
@@ -28,7 +28,6 @@ type Connection struct {
 }
 
 var NotReadyError = errors.New("not ready")
-var AlreadyConnectingError = errors.New("currently connecting")
 
 // Option is the type all options need to adhere to
 type Option func(c *Connection)
@@ -87,7 +86,7 @@ func (c *Connection) Connect() (err error) {
 	}()
 
 	if c.connecting {
-		return AlreadyConnectingError
+		return
 	}
 	c.connecting = true
 	c.ready = false

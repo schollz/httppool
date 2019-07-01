@@ -69,7 +69,7 @@ func (h *HTTPPool) Close() (err error) {
 	for i := 0; i < h.numClients; i++ {
 		err = h.conn[i].Close()
 		if err != nil {
-			log.Warn(err)
+			log.Debug("close error", err)
 		}
 	}
 	return
@@ -77,6 +77,12 @@ func (h *HTTPPool) Close() (err error) {
 
 // Get will randomly select a client in the pool
 func (h *HTTPPool) Get(urlToGet string) (resp *http.Response, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%s", r)
+		}
+	}()
+
 	ar := make([]int, h.numClients)
 	for i := 0; i < len(ar); i++ {
 		ar[i] = i
@@ -89,9 +95,6 @@ tryagain:
 		resp, err = h.conn[i].Get(urlToGet)
 		if err != nil {
 			switch err {
-			case connection.AlreadyConnectingError:
-				log.Debugf("%d is connecting", i)
-				continue
 			case connection.NotReadyError:
 				log.Debugf("%d is not ready", i)
 				continue
@@ -103,10 +106,6 @@ tryagain:
 	}
 	if err != nil {
 		switch err {
-		case connection.AlreadyConnectingError:
-			log.Debug("all are already connecting")
-			time.Sleep(5 * time.Second)
-			goto tryagain
 		case connection.NotReadyError:
 			log.Debug("all are not ready")
 			time.Sleep(1 * time.Second)
