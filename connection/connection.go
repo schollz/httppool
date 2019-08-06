@@ -107,7 +107,7 @@ func (c *Connection) Connect() (err error) {
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 30,
 		},
-		Timeout: 30 * time.Second,
+		Timeout: 180 * time.Second,
 	}
 
 	if c.useTor {
@@ -131,7 +131,7 @@ func (c *Connection) Connect() (err error) {
 			}
 			c.client.Transport = &http.Transport{
 				DialContext:         dialer.DialContext,
-				MaxIdleConnsPerHost: 20,
+				MaxIdleConnsPerHost: 30,
 			}
 
 			resp, err := c.client.Get("http://icanhazip.com/")
