@@ -16,8 +16,9 @@ import (
 // Connection defines a connection
 type Connection struct {
 	// config paramters
-	debug bool
-	name  string
+	debug  bool
+	name   string
+	useTor bool
 
 	connecting bool
 	ready      bool
@@ -36,6 +37,13 @@ type Option func(c *Connection)
 func OptionDebug(debug bool) Option {
 	return func(c *Connection) {
 		c.debug = debug
+	}
+}
+
+// OptionDebug turns on debugging
+func OptionUseTor(useTor bool) Option {
+	return func(c *Connection) {
+		c.useTor = useTor
 	}
 }
 
@@ -102,44 +110,46 @@ func (c *Connection) Connect() (err error) {
 		Timeout: 30 * time.Second,
 	}
 
-	// keep trying until it gets on
-	for {
-		log.Debug("connecting to tor...")
-		c.tor, err = tor.Start(nil, nil)
-		if err != nil {
-			log.Error(err)
-			continue
-		}
+	if c.useTor {
+		// keep trying until it gets on
+		for {
+			log.Debug("connecting to tor...")
+			c.tor, err = tor.Start(nil, nil)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
 
-		// Wait at most a minute to start network and get
-		dialCtx, dialCancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer dialCancel()
-		// Make connection
-		dialer, err := c.tor.Dialer(dialCtx, nil)
-		if err != nil {
-			log.Debug(err)
-			continue
-		}
-		c.client.Transport = &http.Transport{
-			DialContext:         dialer.DialContext,
-			MaxIdleConnsPerHost: 20,
-		}
+			// Wait at most a minute to start network and get
+			dialCtx, dialCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer dialCancel()
+			// Make connection
+			dialer, err := c.tor.Dialer(dialCtx, nil)
+			if err != nil {
+				log.Debug(err)
+				continue
+			}
+			c.client.Transport = &http.Transport{
+				DialContext:         dialer.DialContext,
+				MaxIdleConnsPerHost: 20,
+			}
 
-		resp, err := c.client.Get("http://icanhazip.com/")
-		if err != nil {
-			log.Debug(err)
-			continue
-		}
+			resp, err := c.client.Get("http://icanhazip.com/")
+			if err != nil {
+				log.Debug(err)
+				continue
+			}
 
-		body, err := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			log.Debug(err)
-			continue
+			body, err := ioutil.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				log.Debug(err)
+				continue
+			}
+			log.Debugf("%s: new IP: %s", c.name, bytes.TrimSpace(body))
+			c.ipAddress = string(bytes.TrimSpace(body))
+			break
 		}
-		log.Debugf("%s: new IP: %s", c.name, bytes.TrimSpace(body))
-		c.ipAddress = string(bytes.TrimSpace(body))
-		break
 	}
 
 	c.ready = true

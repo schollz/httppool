@@ -14,6 +14,7 @@ import (
 type HTTPPool struct {
 	debug      bool
 	numClients int
+	useTor     bool
 
 	conn []*connection.Connection
 }
@@ -32,6 +33,13 @@ func OptionDebug(debug bool) Option {
 func OptionNumClients(num int) Option {
 	return func(h *HTTPPool) {
 		h.numClients = num
+	}
+}
+
+// OptionNumClients sets the number of clients
+func OptionUseTor(useTor bool) Option {
+	return func(h *HTTPPool) {
+		h.useTor = useTor
 	}
 }
 
@@ -57,6 +65,7 @@ func New(options ...Option) *HTTPPool {
 		h.conn[i] = connection.New(
 			connection.OptionDebug(h.debug),
 			connection.OptionName(fmt.Sprintf("%d", i)),
+			connection.OptionUseTor(h.useTor),
 		)
 		log.Debugf("starting connection for %d", i)
 		go h.conn[i].Connect()
