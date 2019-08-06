@@ -107,6 +107,7 @@ tryagain:
 		if err != nil {
 			switch err {
 			case connection.NotReadyError:
+				log.Debugf("[%d] not ready", i)
 				continue
 			default:
 				break
