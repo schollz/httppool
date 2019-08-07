@@ -54,8 +54,8 @@ func New(options ...Option) *HTTPPool {
 	}
 
 	if h.debug {
-		log.SetLevel("debug")
-		log.Debug("debug mode on")
+		log.SetLevel("trace")
+		log.Trace("debug mode on")
 	} else {
 		log.SetLevel("info")
 	}
@@ -67,7 +67,7 @@ func New(options ...Option) *HTTPPool {
 			connection.OptionName(fmt.Sprintf("%d", i)),
 			connection.OptionUseTor(h.useTor),
 		)
-		log.Debugf("starting connection for %d", i)
+		log.Tracef("starting connection for %d", i)
 		go h.conn[i].Connect()
 	}
 
@@ -79,7 +79,7 @@ func (h *HTTPPool) Close() (err error) {
 	for i := 0; i < h.numClients; i++ {
 		err = h.conn[i].Close()
 		if err != nil {
-			log.Debug("close error", err)
+			log.Trace("close error", err)
 		}
 	}
 	return
@@ -119,7 +119,7 @@ tryagain:
 			time.Sleep(1 * time.Second)
 			goto tryagain
 		default:
-			log.Debug("Unknown error occurred")
+			log.Trace("Unknown error occurred")
 		}
 	}
 	return

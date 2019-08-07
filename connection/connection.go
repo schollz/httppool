@@ -71,7 +71,7 @@ func New(options ...Option) *Connection {
 func (c *Connection) Close() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Debug("Recovered in Close", r)
+			log.Trace("Recovered in Close", r)
 		}
 	}()
 
@@ -89,7 +89,7 @@ func (c *Connection) Close() (err error) {
 func (c *Connection) Connect() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Debug("Recovered in Connect", r)
+			log.Trace("Recovered in Connect", r)
 		}
 	}()
 
@@ -102,7 +102,7 @@ func (c *Connection) Connect() (err error) {
 	// close any current connections
 	c.Close()
 
-	log.Debugf("%s setting up client", c.name)
+	log.Tracef("%s setting up client", c.name)
 	c.client = &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 30,
@@ -116,7 +116,7 @@ func (c *Connection) Connect() (err error) {
 			if c.tor != nil {
 				c.tor.Close()
 			}
-			log.Debug("connecting to tor...")
+			log.Trace("connecting to tor...")
 			c.tor, err = tor.Start(nil, nil)
 			if err != nil {
 				log.Error(err)
@@ -129,7 +129,7 @@ func (c *Connection) Connect() (err error) {
 			// Make connection
 			dialer, err := c.tor.Dialer(dialCtx, nil)
 			if err != nil {
-				log.Debug(err)
+				log.Trace(err)
 				continue
 			}
 			c.client.Transport = &http.Transport{
@@ -139,17 +139,17 @@ func (c *Connection) Connect() (err error) {
 
 			resp, err := c.client.Get("http://icanhazip.com/")
 			if err != nil {
-				log.Debug(err)
+				log.Trace(err)
 				continue
 			}
 
 			body, err := ioutil.ReadAll(resp.Body)
 			resp.Body.Close()
 			if err != nil {
-				log.Debug(err)
+				log.Trace(err)
 				continue
 			}
-			log.Debugf("%s: new IP: %s", c.name, bytes.TrimSpace(body))
+			log.Tracef("%s: new IP: %s", c.name, bytes.TrimSpace(body))
 			c.ipAddress = string(bytes.TrimSpace(body))
 			break
 		}
@@ -167,13 +167,13 @@ func (c *Connection) Get(urlToGet string) (resp *http.Response, err error) {
 		return
 	}
 
-	log.Debugf("[%s] getting %s", c.name, urlToGet)
+	log.Tracef("[%s] getting %s", c.name, urlToGet)
 	resp, err = c.client.Get(urlToGet)
 	if err != nil || resp.StatusCode != 200 {
 		if err != nil {
-			log.Debugf("[%s] got error: %s", c.name, err.Error())
+			log.Tracef("[%s] got error: %s", c.name, err.Error())
 		} else {
-			log.Debugf("[%s] got status code: %d", c.name, resp.StatusCode)
+			log.Tracef("[%s] got status code: %d", c.name, resp.StatusCode)
 			// bad code received, reload
 			go c.Connect()
 		}
