@@ -102,12 +102,10 @@ func (h *HTTPPool) Get(urlToGet string) (resp *http.Response, err error) {
 tryagain:
 	shuffle(ar)
 	for _, i := range ar {
-		log.Debugf("[%d] getting %s", i, urlToGet)
 		resp, err = h.conn[i].Get(urlToGet)
 		if err != nil {
 			switch err {
 			case connection.NotReadyError:
-				log.Debugf("[%d] not ready", i)
 				continue
 			default:
 				break

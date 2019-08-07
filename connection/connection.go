@@ -113,7 +113,9 @@ func (c *Connection) Connect() (err error) {
 	if c.useTor {
 		// keep trying until it gets on
 		for {
-			c.tor.Close()
+			if c.tor != nil {
+				c.tor.Close()
+			}
 			log.Debug("connecting to tor...")
 			c.tor, err = tor.Start(nil, nil)
 			if err != nil {
