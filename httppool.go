@@ -14,6 +14,8 @@ import (
 type HTTPPool struct {
 	debug      bool
 	numClients int
+	usetor     bool
+	headers    map[string]string
 
 	conn []*connection.Connection
 }
@@ -28,10 +30,27 @@ func OptionDebug(debug bool) Option {
 	}
 }
 
+// OptionuseTor turns on debugging
+func OptionUseTor(usetor bool) Option {
+	return func(h *HTTPPool) {
+		h.usetor = usetor
+	}
+}
+
 // OptionNumClients sets the number of clients
 func OptionNumClients(num int) Option {
 	return func(h *HTTPPool) {
 		h.numClients = num
+	}
+}
+
+// OptionDebug turns on debugging
+func OptionHeaders(headers map[string]string) Option {
+	return func(h *HTTPPool) {
+		h.headers = make(map[string]string)
+		for header := range headers {
+			h.headers[header] = headers[header]
+		}
 	}
 }
 
@@ -40,6 +59,7 @@ func New(options ...Option) *HTTPPool {
 	h := HTTPPool{
 		debug:      false,
 		numClients: 2,
+		headers:    make(map[string]string),
 	}
 	for _, o := range options {
 		o(&h)
@@ -57,6 +77,8 @@ func New(options ...Option) *HTTPPool {
 		h.conn[i] = connection.New(
 			connection.OptionDebug(h.debug),
 			connection.OptionName(fmt.Sprintf("%d", i)),
+			connection.OptionHeaders(h.headers),
+			connection.OptionUseTor(h.usetor),
 		)
 		go h.conn[i].Connect()
 	}

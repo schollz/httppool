@@ -16,8 +16,9 @@ import (
 // Connection defines a connection
 type Connection struct {
 	// config paramters
-	debug bool
-	name  string
+	debug  bool
+	name   string
+	usetor bool
 
 	connecting bool
 	ready      bool
@@ -25,6 +26,7 @@ type Connection struct {
 	ipAddress  string
 	tor        *tor.Tor
 	client     *http.Client
+	headers    map[string]string
 }
 
 var NotReadyError = errors.New("not ready")
@@ -40,6 +42,23 @@ func OptionDebug(debug bool) Option {
 	}
 }
 
+// OptionuseTor turns on debugging
+func OptionUseTor(usetor bool) Option {
+	return func(c *Connection) {
+		c.usetor = usetor
+	}
+}
+
+// OptionDebug turns on debugging
+func OptionHeaders(headers map[string]string) Option {
+	return func(c *Connection) {
+		c.headers = make(map[string]string)
+		for h := range headers {
+			c.headers[h] = headers[h]
+		}
+	}
+}
+
 // OptionName turns on debugging
 func OptionName(name string) Option {
 	return func(c *Connection) {
@@ -50,8 +69,10 @@ func OptionName(name string) Option {
 // New constructs a new instance of HTTPPool
 func New(options ...Option) *Connection {
 	c := Connection{
-		debug: false,
-		name:  "", // TOOD: use UUID?
+		debug:   false,
+		usetor:  true,
+		name:    "", // TOOD: use UUID?
+		headers: make(map[string]string),
 	}
 	for _, o := range options {
 		o(&c)
@@ -105,6 +126,9 @@ func (c *Connection) Connect() (err error) {
 
 	// keep trying until it gets on
 	for {
+		if !c.usetor {
+			break
+		}
 		log.Debug("connecting to tor...")
 		c.tor, err = tor.Start(nil, nil)
 		if err != nil {
@@ -156,7 +180,14 @@ func (c *Connection) Get(urlToGet string) (resp *http.Response, err error) {
 	}
 
 	log.Debugf("[%s] getting %s", c.name, urlToGet)
-	resp, err = c.client.Get(urlToGet)
+	req, err := http.NewRequest("GET", urlToGet, nil)
+	if err != nil {
+		return
+	}
+	for h := range c.headers {
+		req.Header.Set(h, c.headers[h])
+	}
+	resp, err = c.client.Do(req)
 	if err != nil || resp.StatusCode != 200 {
 		if err != nil {
 			log.Debugf("[%s] got error: %s", c.name, err.Error())
