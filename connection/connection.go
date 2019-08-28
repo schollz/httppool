@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cretz/bine/tor"
+	"github.com/schollz/bine/tor"
 	log "github.com/schollz/logger"
 )
 
@@ -30,7 +30,6 @@ type Connection struct {
 }
 
 var NotReadyError = errors.New("not ready")
-var AlreadyConnectingError = errors.New("currently connecting")
 
 // Option is the type all options need to adhere to
 type Option func(c *Connection)
@@ -42,7 +41,7 @@ func OptionDebug(debug bool) Option {
 	}
 }
 
-// OptionuseTor turns on debugging
+// OptionUseTor turns on debugging
 func OptionUseTor(usetor bool) Option {
 	return func(c *Connection) {
 		c.usetor = usetor
@@ -85,7 +84,7 @@ func New(options ...Option) *Connection {
 func (c *Connection) Close() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Debug("Recovered in Close", r)
+			log.Trace("Recovered in Close", r)
 		}
 	}()
 
@@ -103,12 +102,12 @@ func (c *Connection) Close() (err error) {
 func (c *Connection) Connect() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Debug("Recovered in Connect", r)
+			log.Trace("Recovered in Connect", r)
 		}
 	}()
 
 	if c.connecting {
-		return AlreadyConnectingError
+		return
 	}
 	c.connecting = true
 	c.ready = false
@@ -116,12 +115,12 @@ func (c *Connection) Connect() (err error) {
 	// close any current connections
 	c.Close()
 
-	log.Debugf("%s setting up client", c.name)
+	log.Tracef("%s setting up client", c.name)
 	c.client = &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 30,
 		},
-		Timeout: 30 * time.Second,
+		Timeout: 180 * time.Second,
 	}
 
 	// keep trying until it gets on
@@ -190,9 +189,9 @@ func (c *Connection) Get(urlToGet string) (resp *http.Response, err error) {
 	resp, err = c.client.Do(req)
 	if err != nil || resp.StatusCode != 200 {
 		if err != nil {
-			log.Debugf("[%s] got error: %s", c.name, err.Error())
+			log.Tracef("[%s] got error: %s", c.name, err.Error())
 		} else {
-			log.Debugf("[%s] got status code: %d", c.name, resp.StatusCode)
+			log.Tracef("[%s] got status code: %d", c.name, resp.StatusCode)
 			// bad code received, reload
 			go c.Connect()
 		}

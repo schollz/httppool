@@ -44,7 +44,7 @@ func OptionNumClients(num int) Option {
 	}
 }
 
-// OptionDebug turns on debugging
+// OptionHeaders turns on debugging
 func OptionHeaders(headers map[string]string) Option {
 	return func(h *HTTPPool) {
 		h.headers = make(map[string]string)
@@ -66,8 +66,8 @@ func New(options ...Option) *HTTPPool {
 	}
 
 	if h.debug {
-		log.SetLevel("debug")
-		log.Debug("debug mode on")
+		log.SetLevel("trace")
+		log.Trace("debug mode on")
 	} else {
 		log.SetLevel("info")
 	}
@@ -80,6 +80,7 @@ func New(options ...Option) *HTTPPool {
 			connection.OptionHeaders(h.headers),
 			connection.OptionUseTor(h.usetor),
 		)
+		log.Tracef("starting connection for %d", i)
 		go h.conn[i].Connect()
 	}
 
@@ -91,7 +92,7 @@ func (h *HTTPPool) Close() (err error) {
 	for i := 0; i < h.numClients; i++ {
 		err = h.conn[i].Close()
 		if err != nil {
-			log.Warn(err)
+			log.Trace("close error", err)
 		}
 	}
 	return
@@ -99,6 +100,12 @@ func (h *HTTPPool) Close() (err error) {
 
 // Get will randomly select a client in the pool
 func (h *HTTPPool) Get(urlToGet string) (resp *http.Response, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%s", r)
+		}
+	}()
+
 	ar := make([]int, h.numClients)
 	for i := 0; i < len(ar); i++ {
 		ar[i] = i
@@ -111,11 +118,7 @@ tryagain:
 		resp, err = h.conn[i].Get(urlToGet)
 		if err != nil {
 			switch err {
-			case connection.AlreadyConnectingError:
-				log.Debugf("%d is connecting", i)
-				continue
 			case connection.NotReadyError:
-				log.Debugf("%d is not ready", i)
 				continue
 			default:
 				break
@@ -125,27 +128,20 @@ tryagain:
 	}
 	if err != nil {
 		switch err {
-		case connection.AlreadyConnectingError:
-			log.Debug("all are already connecting")
-			time.Sleep(5 * time.Second)
-			goto tryagain
 		case connection.NotReadyError:
-			log.Debug("all are not ready")
 			time.Sleep(1 * time.Second)
 			goto tryagain
 		default:
-			log.Debug("Unknown error occurred")
+			log.Trace("Unknown error occurred")
 		}
 	}
-	log.Debug(err)
 	return
 }
 
 func shuffle(slice []int) {
-	r := rand.New(rand.NewSource(time.Now().Unix()))
 	for len(slice) > 0 {
 		n := len(slice)
-		randIndex := r.Intn(n)
+		randIndex := rand.Intn(n)
 		slice[n-1], slice[randIndex] = slice[randIndex], slice[n-1]
 		slice = slice[:n-1]
 	}
