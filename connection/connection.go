@@ -26,6 +26,7 @@ type Connection struct {
 	ipAddress  string
 	tor        *tor.Tor
 	client     *http.Client
+	timeout    time.Duration
 	headers    map[string]string
 }
 
@@ -45,6 +46,13 @@ func OptionDebug(debug bool) Option {
 func OptionUseTor(usetor bool) Option {
 	return func(c *Connection) {
 		c.usetor = usetor
+	}
+}
+
+// OptionTimeout sets timeout
+func OptionTimeout(timeout time.Duration) Option {
+	return func(c *Connection) {
+		c.timeout = timeout
 	}
 }
 
@@ -70,6 +78,7 @@ func New(options ...Option) *Connection {
 	c := Connection{
 		debug:   false,
 		usetor:  true,
+		timeout: 180 * time.Second,
 		name:    "", // TOOD: use UUID?
 		headers: make(map[string]string),
 	}
@@ -120,7 +129,7 @@ func (c *Connection) Connect() (err error) {
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 30,
 		},
-		Timeout: 180 * time.Second,
+		Timeout: c.timeout,
 	}
 
 	// keep trying until it gets on

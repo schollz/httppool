@@ -16,6 +16,7 @@ type HTTPPool struct {
 	numClients int
 	usetor     bool
 	headers    map[string]string
+	timeout    time.Duration
 
 	conn []*connection.Connection
 }
@@ -34,6 +35,13 @@ func OptionDebug(debug bool) Option {
 func OptionUseTor(usetor bool) Option {
 	return func(h *HTTPPool) {
 		h.usetor = usetor
+	}
+}
+
+// OptionTimeout sets timeout
+func OptionTimeout(timeout time.Duration) Option {
+	return func(h *HTTPPool) {
+		h.timeout = timeout
 	}
 }
 
@@ -60,6 +68,7 @@ func New(options ...Option) *HTTPPool {
 		debug:      false,
 		numClients: 2,
 		headers:    make(map[string]string),
+		timeout:    180 * time.Second,
 	}
 	for _, o := range options {
 		o(&h)
@@ -79,6 +88,7 @@ func New(options ...Option) *HTTPPool {
 			connection.OptionName(fmt.Sprintf("%d", i)),
 			connection.OptionHeaders(h.headers),
 			connection.OptionUseTor(h.usetor),
+			connection.OptionTimeout(h.timeout),
 		)
 		log.Tracef("starting connection for %d", i)
 		go h.conn[i].Connect()
