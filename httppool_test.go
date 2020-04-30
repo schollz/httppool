@@ -2,6 +2,7 @@ package httppool
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"testing"
 
@@ -15,6 +16,7 @@ func TestHTTPPool(t *testing.T) {
 		OptionNumClients(2),
 		OptionUseTor(true),
 	)
+	defer h.Close()
 
 	for i := 0; i < 3; i++ {
 		resp, err := h.Get("http://ipv4.icanhazip.com/")
@@ -25,6 +27,7 @@ func TestHTTPPool(t *testing.T) {
 			resp.Body.Close()
 			log.Debugf("resp: %s", bytes.TrimSpace(body))
 		}
+		fmt.Println(h.PublicIP())
 		resp, err = h.Get("https://httpstat.us/403")
 		log.Debug(err)
 		assert.Nil(t, err)

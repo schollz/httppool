@@ -157,26 +157,41 @@ func (c *Connection) Connect() (err error) {
 			DialContext:         dialer.DialContext,
 			MaxIdleConnsPerHost: 20,
 		}
-
-		resp, err := c.client.Get("http://icanhazip.com/")
+		err = c.getPublicIP()
 		if err != nil {
-			log.Debug(err)
 			continue
 		}
-
-		body, err := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			log.Debug(err)
-			continue
-		}
-		log.Debugf("%s: new IP: %s", c.name, bytes.TrimSpace(body))
-		c.ipAddress = string(bytes.TrimSpace(body))
+		log.Tracef("new IP address: %s", c.ipAddress)
 		break
 	}
 
 	c.ready = true
 	c.connecting = false
+	return
+}
+
+// PublicIP returns the current public IP address, getting it if hasn't been set
+func (c *Connection) PublicIP() string {
+	if c.ipAddress == "" {
+		c.getPublicIP()
+	}
+	return c.ipAddress
+}
+
+func (c *Connection) getPublicIP() (err error) {
+	resp, err := c.client.Get("http://icanhazip.com/")
+	if err != nil {
+		log.Debug(err)
+		return
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		log.Debug(err)
+		return
+	}
+	c.ipAddress = string(bytes.TrimSpace(body))
 	return
 }
 

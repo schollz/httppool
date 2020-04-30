@@ -97,6 +97,15 @@ func New(options ...Option) *HTTPPool {
 	return &h
 }
 
+// PublicIP returns the public IP address of each connection
+func (h *HTTPPool) PublicIP() (ips []string, err error) {
+	ips = make([]string, len(h.conn))
+	for i := range h.conn {
+		ips[i] = h.conn[i].PublicIP()
+	}
+	return
+}
+
 // Close shuts down any nodes
 func (h *HTTPPool) Close() (err error) {
 	for i := 0; i < h.numClients; i++ {
